@@ -1,0 +1,12 @@
+[project]
+name = "votacao-distribuida"
+version = "0.1.0"
+description = "Votação distribuida"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "grpcio==1.85.1",
+    "grpcio-tools==1.85.1",
+    "protobuf==7.36.2",
+]
+

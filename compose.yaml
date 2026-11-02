@@ -1,0 +1,11 @@
+services:
+
+  node1:
+    build: .
+    container_name: node1
+    networks:
+      - voting-net
+
+networks:
+  voting-net:
+    driver: bridge
