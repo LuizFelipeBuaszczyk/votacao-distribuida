@@ -1,5 +1,4 @@
 syntax = "proto3";
-
 package voting;
 
 service VotingService {
@@ -7,6 +6,7 @@ service VotingService {
   rpc StartElection (ElectionRequest) returns (ElectionResponse);
   rpc ReplicateState (ReplicationRequest) returns (ReplicationResponse);
   rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+  rpc DeclareCoordinator (CoordinatorMessage) returns (CoordinatorResponse);
 }
 
 message VoteRequest {
@@ -44,5 +44,13 @@ message HeartbeatRequest {
 }
 
 message HeartbeatResponse {
+  bool acknowledged = 1;
+}
+
+message CoordinatorMessage {
+  int32 new_leader_id = 1;
+}
+
+message CoordinatorResponse {
   bool acknowledged = 1;
 }

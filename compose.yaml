@@ -3,6 +3,25 @@ services:
   node1:
     build: .
     container_name: node1
+    environment:
+      - NODE_ID=1
+      - PEERS=node2:50051,node3:50051
+    networks:
+      - voting-net
+  node2:
+    build: .
+    container_name: node2
+    environment:
+      - NODE_ID=2
+      - PEERS=node1:50051,node3:50051
+    networks:
+      - voting-net
+  node3:
+    build: .
+    container_name: node3
+    environment:
+      - NODE_ID=3
+      - PEERS=node1:50051,node2:50051
     networks:
       - voting-net
 
