@@ -1,5 +1,6 @@
 import time
 from node import Node
+from utils import replicate_vote
 import voting_pb2
 import voting_pb2_grpc
 
@@ -23,11 +24,33 @@ class VotingServicer(voting_pb2_grpc.VotingServiceServicer):
             if request.voter_id in self.node.voted_voters:
                 return voting_pb2.VoteResponse(success=False, message="Eleitor já realizou o voto!")
             
+            # Reserva o eleitor para impedir outro voto dele durante a replicação
             self.node.voted_voters.add(request.voter_id)
-            self.node.votes_count[request.candidate_id] = self.node.votes_count.get(request.candidate_id, 0) + 1
+            lamport_timestamp = self.node.lamport_clock
 
-            # TODO Mandar ReplicateState
+        replicated = replicate_vote(self.node, request.voter_id, request.candidate_id, lamport_timestamp)
+
+        with self.node.lock:
+            if not replicated:
+                self.node.voted_voters.discard(request.voter_id)
+                return voting_pb2.VoteResponse(
+                    success=False,
+                    message="Sem maioria dos nós, voto não confirmado",
+                    retry=True,
+                )
+
+            self.node.votes_count[request.candidate_id] = self.node.votes_count.get(request.candidate_id, 0) + 1
             return voting_pb2.VoteResponse(success=True, message="Voto confirmado")
+
+    def ReplicateState(self, request, context):
+        with self.node.lock:
+            self.node.lamport_clock = max(self.node.lamport_clock, request.lamport_timestamp) + 1
+
+            if request.voter_id not in self.node.voted_voters:
+                self.node.voted_voters.add(request.voter_id)
+                self.node.votes_count[request.candidate_id] = self.node.votes_count.get(request.candidate_id, 0) + 1
+
+            return voting_pb2.ReplicationResponse(success=True)
 
     def GetResults(self, request, context):
         with self.node.lock:
@@ -35,7 +58,7 @@ class VotingServicer(voting_pb2_grpc.VotingServiceServicer):
                 node_id=self.node.node_id,
                 leader_id=self.node.current_leader or 0,
                 accepting_votes=self.node.current_leader == self.node.node_id,
-                total_votes=len(self.node.voted_voters),
+                total_votes=sum(self.node.votes_count.values()),
                 results=[
                     voting_pb2.CandidateResult(candidate_id=candidate, votes=votes)
                     for candidate, votes in sorted(self.node.votes_count.items())
