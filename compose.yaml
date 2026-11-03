@@ -24,6 +24,34 @@ services:
       - PEERS=node1:50051,node2:50051
     networks:
       - voting-net
+  client-a:
+    build: .
+    container_name: client-a
+    command: ["python", "panel.py"]
+    environment:
+      - CLIENT_NAME=Cliente A
+      - NODES=1=node1:50051,2=node2:50051,3=node3:50051
+      - ENTRY_NODE=1
+      - FIRST_VOTER=1
+      - PANEL_URL=http://localhost:8081
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - voting-net
+  client-b:
+    build: .
+    container_name: client-b
+    command: ["python", "panel.py"]
+    environment:
+      - CLIENT_NAME=Cliente B
+      - NODES=1=node1:50051,2=node2:50051,3=node3:50051
+      - ENTRY_NODE=2
+      - FIRST_VOTER=500
+      - PANEL_URL=http://localhost:8082
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks:
+      - voting-net
 
 networks:
   voting-net:

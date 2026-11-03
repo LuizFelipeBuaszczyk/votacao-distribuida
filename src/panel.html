@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Votação distribuída</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #dfe4e8;
+    --surface: #ffffff;
+    --ink: #16202b;
+    --muted: #56636f;
+    --leader: #163e8c;
+    --leader-soft: #c9d6f0;
+    --down: #b3261e;
+    --behind: #8a5a00;
+    --urna: #bdbfb6;
+    --urna-edge: #8f9288;
+    --lcd: #dde3d4;
+    --key: #15181b;
+    --confirm: #12853d;
+    --correct: #e8792b;
+    --bar: #2b5fb8;
+    --font: Bahnschrift, "DIN Alternate", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 17px/1.45 var(--font);
+    font-variant-numeric: tabular-nums;
+  }
+  h1, h2, p, ul { margin: 0; }
+  ul { padding: 0; list-style: none; }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--leader); outline-offset: 2px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 32px;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 24px 32px 32px;
+    align-items: start;
+  }
+  .cluster { display: grid; gap: 24px; min-width: 0; }
+
+  .identity { display: flex; flex-wrap: wrap; gap: 4px 24px; justify-content: space-between; color: var(--muted); }
+  .identity strong { color: var(--ink); font-weight: 600; }
+
+  .status { font-size: clamp(30px, 3.6vw, 56px); line-height: 1.08; font-weight: 600; letter-spacing: -0.015em; max-width: 24ch; }
+  .status.is-alert { color: var(--down); }
+
+  .nodes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .node { display: grid; gap: 2px; padding: 16px 20px 18px; background: var(--surface); min-height: 196px; align-content: start; }
+  .node-name { font-size: 20px; font-weight: 600; }
+  .node-role { color: var(--muted); }
+  .node-votes { font-size: clamp(48px, 5.4vw, 84px); line-height: 1; font-weight: 600; margin-top: 12px; }
+  .node-unit { font-size: 18px; font-weight: 400; margin-left: 6px; }
+  .node-detail { color: var(--muted); margin-top: 6px; }
+  .node-note { color: var(--behind); font-weight: 600; }
+
+  .node.is-leader { background: var(--leader); color: #fff; }
+  .node.is-leader .node-role, .node.is-leader .node-detail { color: var(--leader-soft); }
+  .node.is-leader .node-role { font-weight: 600; }
+  .node.is-leader .node-note { color: #ffd98a; }
+  .node.is-down {
+    color: var(--down);
+    background: repeating-linear-gradient(135deg, #f7e7e5 0 12px, #fff 12px 24px);
+  }
+  .node.is-down .node-role { color: var(--down); font-weight: 600; }
+  .node.just-elected { animation: elected 1.4s ease-out 1; }
+  @keyframes elected { 0%, 40% { box-shadow: 0 0 0 6px #ffd98a; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+  .panel-title { font-size: 20px; font-weight: 600; }
+  .results-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-bottom: 10px; }
+  .results-source { color: var(--muted); }
+  .bars { display: grid; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 96px; gap: 12px; align-items: center; }
+  .bar-track { height: 30px; background: #cfd5da; }
+  .bar-fill { height: 100%; width: 0; background: var(--bar); transition: width .35s ease-out; }
+  .bar-value { text-align: right; white-space: nowrap; }
+  .bar-value strong { font-size: 22px; font-weight: 600; }
+
+  .events-list { max-height: 188px; overflow: auto; margin-top: 8px; border-top: 1px solid #b9c1c8; }
+  .events-list li { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-bottom: 1px solid #cfd5da; }
+  .events-list time { color: var(--muted); }
+  .event-bad { color: var(--down); }
+  .events-list .events-empty { display: block; color: var(--muted); }
+
+  .urna {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    background: var(--urna);
+    border: 1px solid var(--urna-edge);
+    border-bottom-width: 6px;
+    border-radius: 14px;
+    position: sticky;
+    top: 16px;
+  }
+  .screen { display: grid; gap: 10px; padding: 14px; background: var(--lcd); border: 3px solid #5d6159; border-radius: 4px; }
+  .field { display: grid; grid-template-columns: 1fr 112px; align-items: center; gap: 12px; }
+  .field label { font-weight: 600; }
+  .field input {
+    width: 100%;
+    padding: 2px 8px;
+    border: 2px solid var(--ink);
+    border-radius: 0;
+    background: transparent;
+    font-size: 30px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .field input.is-active { background: #fff; }
+  .hint { color: #3f4740; font-size: 15px; }
+  .message { min-height: 76px; border-top: 1px solid #8f9288; padding-top: 8px; }
+  .message-title { font-weight: 600; font-size: 19px; }
+  .message-steps { font-size: 15px; color: #3f4740; }
+  .message.is-ok .message-title { color: #0b6a2f; }
+  .message.is-bad .message-title { color: var(--down); }
+
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .key {
+    height: 54px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--key);
+    box-shadow: inset 0 2px 0 #3b4046;
+    color: #fff;
+    font-size: 26px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .key:active { transform: translateY(2px); box-shadow: none; }
+  .key:focus-visible { outline-color: #fff; outline-offset: -5px; }
+  .key-zero { grid-column: 2; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; align-items: end; }
+  .action { border: 0; border-radius: 7px; font-size: 20px; font-weight: 600; cursor: pointer; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35); }
+  .action:active { transform: translateY(2px); box-shadow: none; }
+  .action:disabled { opacity: .55; cursor: wait; }
+  .action-correct { height: 54px; background: var(--correct); color: #16120d; }
+  .action-confirm { height: 72px; background: var(--confirm); color: #fff; }
+
+  .options { display: grid; gap: 10px; border-top: 1px solid var(--urna-edge); padding-top: 12px; }
+  .entry { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr repeat(var(--count), 56px); gap: 4px; align-items: center; }
+  .entry legend { float: left; padding: 0; font-weight: 600; }
+  .entry label { display: block; }
+  .entry input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .entry span { display: block; padding: 4px 0; text-align: center; background: #e6e7e1; border: 2px solid transparent; border-radius: 5px; cursor: pointer; }
+  .entry input:checked + span { background: var(--ink); color: #fff; }
+  .entry input:focus-visible + span { outline: 3px solid var(--leader); outline-offset: 2px; }
+  .simulate { width: 100%; padding: 10px; background: #e6e7e1; border: 2px solid var(--ink); border-radius: 7px; font-weight: 600; cursor: pointer; }
+  .simulate[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  @media (max-height: 820px) and (min-width: 1001px) {
+    body { font-size: 16px; }
+    .layout { padding: 14px 32px 20px; }
+    .cluster { gap: 14px; }
+    .status { font-size: clamp(26px, 2.8vw, 38px); }
+    .node { min-height: 0; padding: 10px 16px 12px; }
+    .node-votes { font-size: 52px; margin-top: 6px; }
+    .node-detail { margin-top: 2px; }
+    .bar-track { height: 22px; }
+    .bars { gap: 5px; }
+    .results-head { margin-bottom: 6px; }
+    .events-list { max-height: 118px; margin-top: 4px; }
+    .events-list li { padding: 3px 0; }
+    .urna { top: 8px; padding: 10px 12px; gap: 8px; }
+    .screen { padding: 8px 10px; gap: 5px; }
+    .field input { font-size: 22px; padding: 0 8px; }
+    .message { min-height: 62px; padding-top: 4px; }
+    .message-title { font-size: 17px; }
+    .message-steps { font-size: 14px; line-height: 1.25; }
+    #keys { margin-top: 8px !important; gap: 5px; }
+    .key { height: 36px; font-size: 21px; }
+    .action-correct { height: 40px; font-size: 18px; }
+    .action-confirm { height: 50px; font-size: 18px; }
+    .options { padding-top: 8px; gap: 6px; }
+    .simulate { padding: 6px; }
+  }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 24px; }
+    .urna { position: static; max-width: 420px; }
+  }
+  @media (max-width: 620px) {
+    .nodes { grid-template-columns: minmax(0, 1fr); }
+    .node { min-height: 0; }
+    .bar-row { grid-template-columns: 92px minmax(0, 1fr) 84px; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .node.just-elected { animation: none; }
+    .bar-fill { transition: none; }
+    .key:active, .action:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <main class="cluster">
+    <div class="identity">
+      <span><strong>Votação distribuída</strong></span>
+      <span><strong id="client-name">Cliente</strong>, relógio de Lamport <span id="client-clock">0</span></span>
+    </div>
+
+    <h1 class="status" id="status" aria-live="polite">Conectando aos nós</h1>
+
+    <section class="nodes" id="nodes" aria-label="Estado dos nós"></section>
+
+    <section aria-labelledby="results-title">
+      <div class="results-head">
+        <h2 class="panel-title" id="results-title">Resultado</h2>
+        <span class="results-source" id="results-source"></span>
+      </div>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section aria-labelledby="events-title">
+      <h2 class="panel-title" id="events-title">Acontecimentos</h2>
+      <ul class="events-list" id="events" tabindex="0" aria-label="Acontecimentos, do mais recente ao mais antigo">
+        <li class="events-empty" id="events-empty">Os votos e as quedas de nós aparecem aqui.</li>
+      </ul>
+    </section>
+  </main>
+
+  <aside class="urna" aria-label="Urna de votação">
+    <form id="ballot" autocomplete="off">
+      <div class="screen">
+        <div class="field">
+          <label for="voter">Eleitor</label>
+          <input id="voter" inputmode="numeric" maxlength="6" required>
+        </div>
+        <div class="field">
+          <label for="candidate">Candidato</label>
+          <input id="candidate" inputmode="numeric" maxlength="2" required>
+        </div>
+        <p class="hint" id="hint"></p>
+        <div class="message" id="message" aria-live="polite">
+          <p class="message-title" id="message-title">Digite o candidato e confirme.</p>
+          <p class="message-steps" id="message-steps"></p>
+        </div>
+      </div>
+
+      <div class="keys" id="keys" style="margin-top: 14px"></div>
+
+      <div class="actions" style="margin-top: 8px">
+        <button class="action action-correct" type="button" id="correct">Corrige</button>
+        <button class="action action-confirm" type="submit" id="confirm">Confirma</button>
+      </div>
+    </form>
+
+    <div class="options">
+      <fieldset class="entry" id="entry">
+        <legend>Enviar para</legend>
+      </fieldset>
+      <button class="simulate" type="button" id="simulate" aria-pressed="false">Simular votos</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+  const POLL_INTERVAL = 400;
+  const SIMULATION_INTERVAL = 1000;
+  const MAX_EVENTS = 40;
+
+  const $ = (id) => document.getElementById(id);
+  const voterInput = $("voter");
+  const candidateInput = $("candidate");
+
+  let config = null;
+  let activeInput = candidateInput;
+  let nextVoter = 1;
+  let previous = null;
+  let simulating = false;
+  let panelOffline = false;
+  let lastRequest = 0;
+  let lastRendered = 0;
+  const nodeViews = new Map();
+
+  function plural(count, singular, pluralForm) {
+    return `${count} ${count === 1 ? singular : pluralForm}`;
+  }
+
+  function addEvent(text, isBad = false) {
+    const empty = $("events-empty");
+    if (empty) empty.remove();
+
+    const item = document.createElement("li");
+    const time = document.createElement("time");
+    time.textContent = new Date().toLocaleTimeString("pt-BR");
+    const body = document.createElement("span");
+    body.textContent = text;
+    if (isBad) body.className = "event-bad";
+    item.append(time, body);
+
+    const list = $("events");
+    list.prepend(item);
+    while (list.children.length > MAX_EVENTS) list.lastChild.remove();
+  }
+
+  function findLeader(nodes) {
+    const leaders = nodes.filter((node) => node.online && node.leader_id === node.id);
+    return leaders.length ? leaders[leaders.length - 1] : null;
+  }
+
+  function canAcceptVotes(nodes, leader) {
+    const majority = Math.floor(nodes.length / 2) + 1;
+    return leader.accepting_votes && nodes.filter((node) => node.online).length >= majority;
+  }
+
+  function mostUpdated(nodes, leader) {
+    if (leader && leader.accepting_votes) return leader;
+    const online = nodes.filter((node) => node.online);
+    if (!online.length) return null;
+    return online.reduce((best, node) => (node.total_votes > best.total_votes ? node : best));
+  }
+
+  function statusText(nodes, leader, reference) {
+    const online = nodes.filter((node) => node.online);
+    const down = nodes.filter((node) => !node.online);
+
+    if (!online.length) return { text: "Todos os nós estão fora do ar.", alert: true };
+    if (!leader) return { text: "Sem líder: eleição em andamento.", alert: true };
+
+    const leaderText = `Nó ${leader.id} é o líder.`;
+    if (!canAcceptVotes(nodes, leader)) {
+      return { text: `Nó ${leader.id} é o líder, mas está sem maioria. Votos recusados até outro nó voltar.`, alert: true };
+    }
+
+    if (down.length) {
+      const names = down.map((node) => `Nó ${node.id}`).join(" e ");
+      return { text: `${leaderText} ${names} fora do ar, e os votos continuam sendo aceitos.`, alert: false };
+    }
+    if (online.every((node) => node.total_votes === reference.total_votes)) {
+      if (!reference.total_votes) return { text: `${leaderText} Nenhum voto registrado ainda.`, alert: false };
+      return { text: `${leaderText} Os ${online.length} nós têm ${plural(reference.total_votes, "voto", "votos")}.`, alert: false };
+    }
+    return { text: `${leaderText} Os nós estão recebendo os votos que faltam.`, alert: false };
+  }
+
+  function createNodeView(id) {
+    const root = document.createElement("article");
+    root.className = "node";
+    root.innerHTML = `
+      <div class="node-name">Nó ${id}</div>
+      <div class="node-role"></div>
+      <div class="node-votes"><span class="count"></span><span class="node-unit"></span></div>
+      <div class="node-detail"></div>
+      <div class="node-note"></div>`;
+    $("nodes").append(root);
+    const view = {
+      root,
+      role: root.querySelector(".node-role"),
+      count: root.querySelector(".count"),
+      unit: root.querySelector(".node-unit"),
+      detail: root.querySelector(".node-detail"),
+      note: root.querySelector(".node-note"),
+    };
+    nodeViews.set(id, view);
+    return view;
+  }
+
+  function renderNodes(nodes, leader, reference) {
+    for (const node of nodes) {
+      const view = nodeViews.get(node.id) || createNodeView(node.id);
+      const isLeader = leader && leader.id === node.id;
+      view.root.classList.toggle("is-leader", Boolean(isLeader));
+      view.root.classList.toggle("is-down", !node.online);
+
+      if (!node.online) {
+        view.role.textContent = "Fora do ar";
+        view.count.textContent = "–";
+        view.unit.textContent = "";
+        view.detail.textContent = "Sem resposta";
+        view.note.textContent = "";
+        continue;
+      }
+
+      view.role.textContent = isLeader ? "Líder" : node.leader_id ? "Seguidor" : "Aguardando um líder";
+      view.count.textContent = node.total_votes;
+      view.unit.textContent = node.total_votes === 1 ? "voto" : "votos";
+      view.detail.textContent = `Lamport ${node.lamport_clock}`;
+
+      const missing = reference ? reference.total_votes - node.total_votes : 0;
+      if (isLeader && !canAcceptVotes(nodes, node)) view.note.textContent = "Sem maioria";
+      else if (missing > 0) view.note.textContent = `Faltam ${plural(missing, "voto", "votos")}`;
+      else view.note.textContent = "";
+    }
+  }
+
+  function renderResults(reference, leader) {
+    const bars = $("bars");
+    if (!bars.children.length) {
+      for (let candidate = 1; candidate <= config.candidates; candidate += 1) {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        row.innerHTML = `
+          <span>Candidato ${candidate}</span>
+          <div class="bar-track"><div class="bar-fill" data-fill="${candidate}"></div></div>
+          <span class="bar-value" data-value="${candidate}"></span>`;
+        bars.append(row);
+      }
+    }
+
+    const results = reference ? reference.results : {};
+    const total = reference ? reference.total_votes : 0;
+    const highest = Math.max(1, ...Object.values(results));
+
+    for (let candidate = 1; candidate <= config.candidates; candidate += 1) {
+      const votes = results[candidate] || 0;
+      bars.querySelector(`[data-fill="${candidate}"]`).style.width = `${(votes / highest) * 100}%`;
+      const value = bars.querySelector(`[data-value="${candidate}"]`);
+      const percent = total ? Math.round((votes / total) * 100) : 0;
+      value.innerHTML = "";
+      const strong = document.createElement("strong");
+      strong.textContent = votes;
+      value.append(strong, ` (${percent}%)`);
+    }
+
+    if (!reference) $("results-source").textContent = "Nenhum nó respondendo";
+    else if (leader && reference.id === leader.id) $("results-source").textContent = `Contagem do líder, nó ${reference.id}`;
+    else $("results-source").textContent = `Contagem do nó ${reference.id}, sem líder confirmado`;
+  }
+
+  function reportChanges(nodes, leader) {
+    if (!previous) return;
+
+    for (const node of nodes) {
+      const before = previous.nodes.find((item) => item.id === node.id);
+      if (before && before.online && !node.online) addEvent(`Nó ${node.id} ficou fora do ar`, true);
+      if (before && !before.online && node.online) addEvent(`Nó ${node.id} voltou`);
+    }
+
+    const leaderId = leader ? leader.id : null;
+    if (leaderId !== previous.leaderId) {
+      if (leaderId === null) {
+        addEvent("Sem líder: eleição em andamento", true);
+      } else {
+        addEvent(`Nó ${leaderId} virou o líder`);
+        const view = nodeViews.get(leaderId);
+        view.root.classList.remove("just-elected");
+        void view.root.offsetWidth;
+        view.root.classList.add("just-elected");
+      }
+    }
+  }
+
+  function setupConfig(received, suggestedVoter) {
+    config = received;
+    document.title = `${config.name}: votação distribuída`;
+    $("client-name").textContent = config.name;
+    nextVoter = suggestedVoter;
+    voterInput.value = nextVoter;
+    $("hint").textContent = `Candidatos de 1 a ${config.candidates}`;
+
+    const entry = $("entry");
+    entry.style.setProperty("--count", config.nodes.length);
+    for (const id of config.nodes) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "entry";
+      input.value = id;
+      input.checked = id === config.entry_node;
+      const text = document.createElement("span");
+      text.textContent = `Nó ${id}`;
+      label.append(input, text);
+      entry.append(label);
+    }
+    activate(candidateInput);
+    candidateInput.focus();
+  }
+
+  async function refresh() {
+    lastRequest += 1;
+    const request = lastRequest;
+    try {
+      const response = await fetch("/api/state");
+      const state = await response.json();
+      if (request < lastRendered) return;
+      lastRendered = request;
+      if (!config) setupConfig(state.config, state.next_voter);
+
+      const { nodes } = state;
+      const leader = findLeader(nodes);
+      const reference = mostUpdated(nodes, leader);
+      const status = statusText(nodes, leader, reference);
+
+      $("status").textContent = status.text;
+      $("status").classList.toggle("is-alert", status.alert);
+      $("client-clock").textContent = state.client_clock;
+
+      renderNodes(nodes, leader, reference);
+      renderResults(reference, leader);
+      reportChanges(nodes, leader);
+      previous = { nodes, leaderId: leader ? leader.id : null };
+      panelOffline = false;
+    } catch {
+      if (!panelOffline) addEvent("O painel perdeu a conexão com o client", true);
+      panelOffline = true;
+      $("status").textContent = "O painel perdeu a conexão com o client. Verifique se o Docker está rodando.";
+      $("status").classList.add("is-alert");
+    }
+  }
+
+  async function poll() {
+    await refresh();
+    setTimeout(poll, POLL_INTERVAL);
+  }
+
+  function selectedEntry() {
+    const checked = document.querySelector('input[name="entry"]:checked');
+    return checked ? Number(checked.value) : null;
+  }
+
+  async function sendVote(voter, candidate) {
+    try {
+      const response = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voter, candidate, entry: selectedEntry() }),
+      });
+      return await response.json();
+    } catch {
+      return { success: false, message: "O painel perdeu a conexão com o client.", steps: [] };
+    }
+  }
+
+  function showMessage(title, steps = "", kind = "") {
+    $("message").className = `message ${kind}`;
+    $("message-title").textContent = title;
+    $("message-steps").textContent = steps;
+  }
+
+  function activate(input) {
+    activeInput = input;
+    voterInput.classList.toggle("is-active", input === voterInput);
+    candidateInput.classList.toggle("is-active", input === candidateInput);
+  }
+
+  async function submitBallot(event) {
+    event.preventDefault();
+    const voter = Number(voterInput.value);
+    const candidate = Number(candidateInput.value);
+
+    if (!voter) {
+      showMessage("Digite o número do eleitor.", "", "is-bad");
+      activate(voterInput);
+      voterInput.focus();
+      return;
+    }
+    if (!candidate) {
+      showMessage("Digite o número do candidato.", "", "is-bad");
+      activate(candidateInput);
+      candidateInput.focus();
+      return;
+    }
+
+    $("confirm").disabled = true;
+    showMessage(`Enviando o voto do eleitor ${voter}.`, "Durante uma eleição, isso pode levar alguns segundos.");
+    const result = await sendVote(voter, candidate);
+    $("confirm").disabled = false;
+
+    const steps = result.steps.join(". ");
+    showMessage(result.message, steps, result.success ? "is-ok" : "is-bad");
+    addEvent(`Eleitor ${voter}, candidato ${candidate}: ${result.message}`, !result.success);
+    refresh();
+
+    if (result.success) {
+      nextVoter = voter + 1;
+      voterInput.value = nextVoter;
+      candidateInput.value = "";
+      activate(candidateInput);
+    }
+    candidateInput.focus();
+  }
+
+  async function runSimulation() {
+    while (simulating) {
+      const voter = nextVoter;
+      nextVoter += 1;
+      if (document.activeElement !== voterInput) voterInput.value = nextVoter;
+
+      const candidate = 1 + Math.floor(Math.random() * config.candidates);
+      const result = await sendVote(voter, candidate);
+      addEvent(`Eleitor ${voter}, candidato ${candidate}: ${result.message}`, !result.success);
+      refresh();
+      await new Promise((resolve) => setTimeout(resolve, SIMULATION_INTERVAL));
+    }
+  }
+
+  function buildKeypad() {
+    const keys = $("keys");
+    for (const digit of [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
+      const key = document.createElement("button");
+      key.type = "button";
+      key.className = digit === 0 ? "key key-zero" : "key";
+      key.textContent = digit;
+      key.addEventListener("click", () => {
+        if (activeInput.value.length < activeInput.maxLength) activeInput.value += digit;
+        activeInput.focus();
+      });
+      keys.append(key);
+    }
+  }
+
+  for (const input of [voterInput, candidateInput]) {
+    input.addEventListener("focus", () => activate(input));
+    input.addEventListener("input", () => { input.value = input.value.replace(/\D/g, ""); });
+  }
+
+  $("correct").addEventListener("click", () => {
+    activeInput.value = "";
+    showMessage("Digite o candidato e confirme.");
+    activeInput.focus();
+  });
+
+  $("simulate").addEventListener("click", () => {
+    simulating = !simulating;
+    const button = $("simulate");
+    button.setAttribute("aria-pressed", simulating);
+    button.textContent = simulating ? "Parar simulação" : "Simular votos";
+    if (simulating) runSimulation();
+  });
+
+  $("ballot").addEventListener("submit", submitBallot);
+  buildKeypad();
+  poll();
+</script>
+</body>
+</html>

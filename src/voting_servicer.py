@@ -83,6 +83,7 @@ class VotingServicer(voting_pb2_grpc.VotingServiceServicer):
                 leader_id=self.node.current_leader or 0,
                 accepting_votes=self.node.current_leader == self.node.node_id and self.node.synced,
                 total_votes=len(self.node.votes),
+                lamport_clock=self.node.lamport_clock,
                 results=[
                     voting_pb2.CandidateResult(candidate_id=candidate_id, votes=votes)
                     for candidate_id, votes in sorted(counts.items())

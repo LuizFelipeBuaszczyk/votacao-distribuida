@@ -38,6 +38,7 @@ message ResultsResponse {
   bool accepting_votes = 3;
   int64 total_votes = 4;
   repeated CandidateResult results = 5;
+  int64 lamport_clock = 6;
 }
 
 message ElectionRequest {
