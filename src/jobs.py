@@ -32,6 +32,7 @@ def heartbeat(node: Node):
     print("Iniciando tarefa de heartbeat")
 
     while True:
+        time.sleep(1)
         if node.current_leader != node.node_id:
             continue
        
@@ -39,20 +40,20 @@ def heartbeat(node: Node):
             node.lamport_clock += 1
             current_clock = node.lamport_clock
 
-            for peer in node.peers:
-                try:
-                    print(f"Mandando heartbeat para {peer}")
-                    channel = grpc.insecure_channel(peer)
-                    stub = voting_pb2_grpc.VotingServiceStub(channel)
-                    stub.Heartbeat(
-                        voting_pb2.HeartbeatRequest(
-                            leader_id=node.node_id,
-                            lamport_timestamp=current_clock
-                        ),
-                        timeout=1
-                    )
-                except Exception as e:
-                    print(str(e))
-                    pass
+        for peer in node.peers:
+            try:
+                print(f"Mandando heartbeat para {peer}")
+                channel = grpc.insecure_channel(peer)
+                stub = voting_pb2_grpc.VotingServiceStub(channel)
+                stub.Heartbeat(
+                    voting_pb2.HeartbeatRequest(
+                        leader_id=node.node_id,
+                        lamport_timestamp=current_clock
+                    ),
+                    timeout=1
+                )
+            except Exception as e:
+                print(str(e))
+                pass
 
 
