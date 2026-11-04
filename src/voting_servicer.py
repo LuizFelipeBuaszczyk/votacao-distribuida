@@ -2,8 +2,9 @@ import time
 from collections import Counter
 from node import Node
 from utils import replicate_vote, vote_records
-import voting_pb2
-import voting_pb2_grpc
+
+from protocols import voting_pb2
+from protocols import voting_pb2_grpc
 
 class VotingServicer(voting_pb2_grpc.VotingServiceServicer):
 

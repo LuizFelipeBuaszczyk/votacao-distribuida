@@ -5,8 +5,8 @@ from node import Node
 
 def replicate_vote(node: Node, voter_id: int, candidate_id: int, lamport_timestamp: int) -> bool:
     """Envia o voto a todos os seguidores e retorna True assim que a maioria dos nós o tiver."""
-    import voting_pb2
-    import voting_pb2_grpc
+    from protocols import voting_pb2
+    from protocols import voting_pb2_grpc
     import grpc
 
     request = voting_pb2.ReplicationRequest(
@@ -40,7 +40,7 @@ def replicate_vote(node: Node, voter_id: int, candidate_id: int, lamport_timesta
 
 def vote_records(node: Node) -> list:
     """Converte os votos do nó para o formato do gRPC. Deve ser chamado com o lock adquirido."""
-    import voting_pb2
+    from protocols import voting_pb2
 
     return [
         voting_pb2.VoteRecord(voter_id=voter_id, candidate_id=candidate_id, lamport_timestamp=lamport_timestamp)
@@ -49,8 +49,8 @@ def vote_records(node: Node) -> list:
 
 def exchange_votes(node: Node, peers: list) -> int:
     """Troca votos com os peers: os dois lados ficam com a união. Retorna quantos responderam."""
-    import voting_pb2
-    import voting_pb2_grpc
+    from protocols import voting_pb2
+    from protocols import voting_pb2_grpc
     import grpc
 
     with node.lock:
@@ -85,8 +85,8 @@ def sync_leader(node: Node):
             print(f"[{node.node_id}] Sincronizado com {responded} nó(s): {len(node.votes)} votos.")
 
 def run_bully_election(node: Node):
-    import voting_pb2
-    import voting_pb2_grpc
+    from protocols import voting_pb2
+    from protocols import voting_pb2_grpc
     import grpc
     
     higher_nodes_responded = False

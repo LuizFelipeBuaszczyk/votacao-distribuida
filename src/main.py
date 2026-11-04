@@ -9,7 +9,8 @@ from node import Node
 from jobs import monitor, heartbeat
 from utils import run_bully_election
 
-import voting_pb2_grpc
+from protocols import voting_pb2, voting_pb2_grpc
+
 
 def run():
     node_id = int(os.environ["NODE_ID"])
