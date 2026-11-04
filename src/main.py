@@ -15,7 +15,7 @@ from protocols import voting_pb2, voting_pb2_grpc
 def run():
     node_id = int(os.environ["NODE_ID"])
     peers = os.environ["PEERS"].split(",")
-    port = 50051
+    port = 50050 + node_id
 
     node = Node(node_id, peers)
 

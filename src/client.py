@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import grpc
 
-import voting_pb2
-import voting_pb2_grpc
+from protocols import voting_pb2
+from protocols import voting_pb2_grpc
 
 VOTE_TIMEOUT = 2.5
 STATE_TIMEOUT = 0.8
