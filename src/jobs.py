@@ -28,8 +28,8 @@ def monitor(node: Node):
 
 
 def heartbeat(node: Node):
-    import voting_pb2_grpc
-    import voting_pb2
+    from protocols import voting_pb2_grpc
+    from protocols import voting_pb2
     import grpc
     from utils import exchange_votes, sync_leader
     print("Iniciando tarefa de heartbeat")
