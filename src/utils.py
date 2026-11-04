@@ -92,7 +92,8 @@ def run_bully_election(node: Node):
     higher_nodes_responded = False
     for peer in node.peers:
         peer_name, peer_port = peer.split(":")
-        peer_id = int(peer_name.replace("node", ""))
+
+        peer_id = int(peer_port) - 50050
 
 
         if peer_id > node.node_id:
