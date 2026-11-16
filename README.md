@@ -48,4 +48,4 @@ docker compose exec client-a python client.py results
 
 ## Protocolo
 
-O contrato gRPC está em `src/protocols/voting.proto`.
+O contrato gRPC está em `src/protocols/voting.proto`. A descrição de cada mensagem, das respostas de voto e dos fluxos de eleição e replicação está em [PROTOCOLO.md](PROTOCOLO.md).
